@@ -110,6 +110,20 @@ Suggest a repair for the most recent failed command:
 lsh repair
 ```
 
+Initialize capabilities config:
+
+```bash
+lsh init
+# Edit .lsh/config.json to customize allowed/blocked commands, risk threshold, timeout
+```
+
+View audit log:
+
+```bash
+lsh audit
+lsh audit -n 20
+```
+
 ## Architecture
 
 The first version uses these modules:
@@ -117,10 +131,12 @@ The first version uses these modules:
 - `lsh.schema`: Pydantic models for `Plan`, plan steps, action args, and validation results.
 - `lsh.planner`: planner interface and mock planner.
 - `lsh.gemini_planner`: Gemini Flash planner (free-tier LLM integration).
-- `lsh.validator`: policy checks for actions and command strings.
+- `lsh.config`: capability configuration (`.lsh/config.json`).
+- `lsh.validator`: policy checks using capability config.
 - `lsh.executor`: controlled execution for validated plans.
 - `lsh.context`: current working directory, OS, file preview, and recent history.
 - `lsh.history`: JSONL execution history.
+- `lsh.audit`: JSONL audit log for all plan evaluations.
 - `lsh.cli`: command-line interface.
 
 ## Roadmap
@@ -130,7 +146,7 @@ v0.2:
 - ~~Real LLM integration~~ ✓ (Gemini Flash)
 - ~~JSON schema constrained output~~ ✓
 - ~~Automatic repair suggestions for failed commands~~ ✓ (LLM-powered explain-error & repair)
-- Finer-grained capability system
+- ~~Finer-grained capability system~~ ✓ (`.lsh/config.json`)
 
 v0.3:
 
@@ -140,6 +156,6 @@ v0.3:
 
 v0.4:
 
+- ~~Audit log~~ ✓ (`.lsh/audit.jsonl`)
 - Policy engine
-- Audit log
 - Reversible operations

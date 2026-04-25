@@ -9,6 +9,8 @@ from pydantic import ValidationError as PydanticValidationError
 
 import os
 
+from lsh.audit import AuditEntry, log_audit, read_audit
+from lsh.config import LshConfig, load_config, save_config
 from lsh.context import collect_context
 from lsh.executor import Executor
 from lsh.history import last_record
@@ -27,6 +29,10 @@ def main(argv: Optional[List[str]] = None) -> int:
         return _handle_explain_error()
     if args.command == "repair":
         return _handle_repair()
+    if args.command == "init":
+        return _handle_init()
+    if args.command == "audit":
+        return _handle_audit(args)
 
     parser.print_help()
     return 1
@@ -43,6 +49,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     subparsers.add_parser("explain-error", help="Explain stderr from the most recent command")
     subparsers.add_parser("repair", help="Suggest a repair for the most recent failed command")
+    subparsers.add_parser("init", help="Create .lsh/config.json with default capabilities")
+
+    audit = subparsers.add_parser("audit", help="Show recent audit log entries")
+    audit.add_argument("-n", type=int, default=10, help="Number of entries to show")
 
     return parser
 
@@ -51,6 +61,9 @@ def _handle_ask(args: argparse.Namespace) -> int:
     if args.execute and args.dry_run:
         print("Use either --execute or --dry-run, not both.")
         return 2
+
+    config = load_config()
+    caps = config.capabilities
 
     planner = _get_planner()
     try:
@@ -62,7 +75,7 @@ def _handle_ask(args: argparse.Namespace) -> int:
 
     print(format_plan(plan))
 
-    validation = validate_plan(plan)
+    validation = validate_plan(plan, caps)
     if validation.warnings:
         print("\nWarnings:")
         for warning in validation.warnings:
@@ -72,18 +85,42 @@ def _handle_ask(args: argparse.Namespace) -> int:
         print("\nExecute? no, because --execute was not provided.")
         return 0
 
+    max_risk = Risk(caps.max_auto_risk)
+
     if not validation.ok:
+        _log_rejected(plan, validation, args.task)
         print_rejection(validation)
         return 1
 
-    if validation.risk is not Risk.LOW:
+    risk_order = {Risk.LOW: 0, Risk.MEDIUM: 1, Risk.HIGH: 2}
+    if risk_order[validation.risk] > risk_order[max_risk]:
+        _log_rejected(plan, validation, args.task)
         print("Rejected by validator:")
-        print(f"- only low risk plans can be executed in v1; validator risk: {validation.risk.value}")
+        print(f"- plan risk ({validation.risk.value}) exceeds max_auto_risk ({caps.max_auto_risk})")
         return 1
 
-    result = Executor().execute(plan)
+    _log_accepted(plan, validation, args.task)
+    result = Executor(timeout_seconds=caps.max_timeout_seconds).execute(plan)
     print_execution_result(result)
     return 0 if result.ok else 1
+
+
+def _log_accepted(plan: Plan, validation: ValidationResult, user_input: str) -> None:
+    log_audit(AuditEntry(
+        intent=plan.intent, risk=validation.risk.value, accepted=True,
+        user_input=user_input,
+        steps=[s.action for s in plan.steps],
+        warnings=validation.warnings,
+    ))
+
+
+def _log_rejected(plan: Plan, validation: ValidationResult, user_input: str) -> None:
+    log_audit(AuditEntry(
+        intent=plan.intent, risk=validation.risk.value, accepted=False,
+        user_input=user_input,
+        errors=validation.errors, warnings=validation.warnings,
+        steps=[s.action for s in plan.steps],
+    ))
 
 
 def _handle_explain_error() -> int:
@@ -206,6 +243,29 @@ def _repair_suggestion(command: str, stdout: str, stderr: str) -> str:
     if stdout:
         return "Review stdout and stderr together, then retry with a narrower command."
     return "Inspect the stderr message and retry with corrected arguments."
+
+
+def _handle_init() -> int:
+    path = save_config(LshConfig())
+    print(f"Created {path}")
+    print("Edit .lsh/config.json to customize capabilities.")
+    return 0
+
+
+def _handle_audit(args: argparse.Namespace) -> int:
+    entries = read_audit(limit=args.n)
+    if not entries:
+        print("No audit entries found.")
+        return 0
+    for entry in entries:
+        status = "ACCEPTED" if entry.get("accepted") else "REJECTED"
+        intent = entry.get("intent", "?")
+        risk = entry.get("risk", "?")
+        ts = entry.get("timestamp", "")[:19]
+        print(f"[{ts}] {status}  risk={risk}  intent={intent}")
+        for err in entry.get("errors", []):
+            print(f"  error: {err}")
+    return 0
 
 
 def _get_planner() -> Planner:

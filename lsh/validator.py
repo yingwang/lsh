@@ -5,41 +5,25 @@ from __future__ import annotations
 import re
 import shlex
 from pathlib import Path
-from typing import List, Tuple
+from typing import List, Optional, Set, Tuple
 
+from lsh.config import Capabilities, load_config
 from lsh.schema import Plan, Risk, ValidationResult
 
 
-DANGEROUS_COMMANDS = {
-    "rm",
-    "sudo",
-    "chmod",
-    "chown",
-    "mkfs",
-    "dd",
-    "eval",
+_DEFAULT_DANGEROUS = {
+    "rm", "sudo", "chmod", "chown", "mkfs", "dd", "eval",
 }
 
 PACKAGE_MANAGERS = {
-    "apt",
-    "apt-get",
-    "brew",
-    "dnf",
-    "yum",
-    "pacman",
-    "apk",
-    "pip",
-    "pip3",
-    "python",
-    "python3",
-    "npm",
-    "pnpm",
-    "yarn",
+    "apt", "apt-get", "brew", "dnf", "yum", "pacman", "apk",
+    "pip", "pip3", "python", "python3",
+    "npm", "pnpm", "yarn",
 }
 
 SYSTEM_DIRS = ("/etc", "/usr", "/bin", "/sbin", "/var")
 
-LOW_RISK_COMMANDS = {"ls", "pwd", "whoami", "date", "echo"}
+_DEFAULT_LOW_RISK = {"ls", "pwd", "whoami", "date", "echo"}
 
 FORK_BOMB_PATTERNS = (
     re.compile(r":\s*\(\s*\)\s*\{\s*:\s*\|\s*:\s*&\s*\}\s*;?\s*:"),
@@ -47,17 +31,24 @@ FORK_BOMB_PATTERNS = (
 )
 
 
-def validate_plan(plan: Plan) -> ValidationResult:
+def validate_plan(plan: Plan, caps: Optional[Capabilities] = None) -> ValidationResult:
+    if caps is None:
+        caps = load_config().capabilities
     errors: List[str] = []
     warnings: List[str] = []
     computed_risk = Risk.LOW
+
+    blocked = set(caps.blocked_commands)
+    allowed = set(caps.allowed_commands)
 
     if plan.risk is Risk.HIGH:
         errors.append("high risk plans are not allowed in v1")
 
     for step in plan.steps:
         if step.action == "run_command":
-            command_errors, command_warnings, command_risk = _validate_command(step.args.command)
+            command_errors, command_warnings, command_risk = _validate_command(
+                step.args.command, blocked=blocked, allowed=allowed,
+            )
             errors.extend(command_errors)
             warnings.extend(command_warnings)
             computed_risk = _max_risk(computed_risk, command_risk)
@@ -81,7 +72,11 @@ def validate_plan(plan: Plan) -> ValidationResult:
     )
 
 
-def _validate_command(command: str) -> Tuple[List[str], List[str], Risk]:
+def _validate_command(
+    command: str,
+    blocked: Set[str] = _DEFAULT_DANGEROUS,
+    allowed: Set[str] = frozenset(),
+) -> Tuple[List[str], List[str], Risk]:
     errors: List[str] = []
     warnings: List[str] = []
     risk = Risk.MEDIUM
@@ -114,7 +109,7 @@ def _validate_command(command: str) -> Tuple[List[str], List[str], Risk]:
         return ["command must not be empty"], warnings, Risk.HIGH
 
     program = Path(parts[0]).name
-    if program in DANGEROUS_COMMANDS:
+    if program in blocked:
         errors.append(f"dangerous command: {program}")
         errors.append("destructive operation is not allowed in v1")
 
@@ -125,7 +120,7 @@ def _validate_command(command: str) -> Tuple[List[str], List[str], Risk]:
         if _is_system_path(Path(token)) and _looks_like_write_command(program):
             errors.append(f"modifying system path is not allowed: {token}")
 
-    if program in LOW_RISK_COMMANDS and not errors:
+    if (program in _DEFAULT_LOW_RISK or program in allowed) and not errors:
         risk = Risk.LOW
 
     return errors, warnings, risk
