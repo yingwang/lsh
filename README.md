@@ -27,7 +27,7 @@ The v0.1 safety boundary is intentionally small:
 From the project root:
 
 ```bash
-python3.9 -m venv .venv
+python3 -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
 ```
