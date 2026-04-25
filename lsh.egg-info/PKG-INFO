@@ -1,3 +1,13 @@
+Metadata-Version: 2.4
+Name: lsh
+Version: 0.1.0
+Summary: Safe LLM Shell: natural language to validated execution plans
+Requires-Python: >=3.9
+Description-Content-Type: text/markdown
+Requires-Dist: pydantic>=2.0
+Provides-Extra: dev
+Requires-Dist: pytest>=7.0; extra == "dev"
+
 # lsh - Safe LLM Shell
 
 `lsh` is a minimal safe shell assistant. It turns natural language into a structured execution plan, validates that plan, and only then runs low-risk actions through a controlled executor.
@@ -27,7 +37,7 @@ The v0.1 safety boundary is intentionally small:
 From the project root:
 
 ```bash
-python3 -m venv .venv
+python3.9 -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
 ```

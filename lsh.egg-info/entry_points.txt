@@ -1,0 +1,2 @@
+[console_scripts]
+lsh = lsh.cli:main
