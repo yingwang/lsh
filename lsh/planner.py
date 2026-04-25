@@ -96,12 +96,3 @@ class MockPlanner(Planner):
         )
 
 
-class OpenAIPlanner(Planner):
-    def plan(self, user_input: str, context: Dict[str, Any]) -> Plan:
-        """Future real LLM-backed planner.
-
-        TODO: Use JSON schema constrained output and validate the model result
-        with lsh.schema.Plan before any validator or executor sees it.
-        """
-
-        raise NotImplementedError("OpenAIPlanner is reserved for a later release")

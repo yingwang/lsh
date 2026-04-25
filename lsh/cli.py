@@ -96,6 +96,15 @@ def _handle_explain_error() -> int:
     if not stderr:
         print("The most recent command has no stderr.")
         return 0
+    if os.environ.get("GEMINI_API_KEY"):
+        from lsh.gemini_planner import gemini_explain_error
+        try:
+            result = gemini_explain_error(command, stderr)
+            if result:
+                print(result)
+                return 0
+        except Exception:
+            pass
     print(_explain_error(command, stderr))
     return 0
 
@@ -112,6 +121,16 @@ def _handle_repair() -> int:
     command = str(record.get("command", ""))
     stderr = str(record.get("stderr", ""))
     stdout = str(record.get("stdout", ""))
+    if os.environ.get("GEMINI_API_KEY"):
+        from lsh.gemini_planner import gemini_repair
+        try:
+            result = gemini_repair(command, stdout, stderr)
+            if result:
+                print("Repair suggestion:")
+                print(result)
+                return 0
+        except Exception:
+            pass
     print("Repair suggestion:")
     print(_repair_suggestion(command, stdout, stderr))
     return 0

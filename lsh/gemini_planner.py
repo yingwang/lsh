@@ -12,6 +12,12 @@ from typing import Any, Dict
 from lsh.planner import Planner
 from lsh.schema import Plan, parse_plan
 
+_FALLBACK_MODELS = [
+    "gemini-2.0-flash-lite",
+    "gemini-2.0-flash",
+    "gemini-2.5-flash-lite",
+]
+
 _DEFAULT_MODEL = "gemini-2.0-flash"
 _BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models"
 
@@ -45,15 +51,21 @@ run_command when possible.
 """
 
 
-def _call_gemini(prompt: str, api_key: str, model: str = _DEFAULT_MODEL) -> str:
+def _call_gemini_raw(
+    prompt: str,
+    api_key: str,
+    model: str = _DEFAULT_MODEL,
+    system: str = _SYSTEM_PROMPT,
+    json_mode: bool = True,
+) -> str:
     """Call Gemini API and return the text response."""
+    gen_config: Dict[str, Any] = {"temperature": 0.1}
+    if json_mode:
+        gen_config["responseMimeType"] = "application/json"
     payload = json.dumps({
-        "system_instruction": {"parts": [{"text": _SYSTEM_PROMPT}]},
+        "system_instruction": {"parts": [{"text": system}]},
         "contents": [{"parts": [{"text": prompt}]}],
-        "generationConfig": {
-            "temperature": 0.1,
-            "responseMimeType": "application/json",
-        },
+        "generationConfig": gen_config,
     }).encode()
 
     url = f"{_BASE_URL}/{model}:generateContent?key={api_key}"
@@ -76,19 +88,33 @@ def _call_gemini(prompt: str, api_key: str, model: str = _DEFAULT_MODEL) -> str:
     return body["candidates"][0]["content"]["parts"][0]["text"]
 
 
+def _call_with_fallback(
+    prompt: str,
+    api_key: str,
+    model: str | None = None,
+    system: str = _SYSTEM_PROMPT,
+    json_mode: bool = True,
+) -> str:
+    """Try models in order, skip 429s."""
+    models = [model] if model else _FALLBACK_MODELS
+    last_err: Exception | None = None
+    for m in models:
+        try:
+            return _call_gemini_raw(prompt, api_key, m, system, json_mode)
+        except RuntimeError as exc:
+            last_err = exc
+            if "429" in str(exc):
+                continue
+            raise
+    raise last_err  # type: ignore[misc]
+
+
 def _extract_json(text: str) -> str:
     """Strip markdown fences if the model wraps the JSON."""
     m = re.search(r"```(?:json)?\s*\n?(.*?)```", text, re.DOTALL)
     if m:
         return m.group(1).strip()
     return text.strip()
-
-
-_FALLBACK_MODELS = [
-    "gemini-2.0-flash-lite",
-    "gemini-2.0-flash",
-    "gemini-2.5-flash-lite",
-]
 
 
 class GeminiPlanner(Planner):
@@ -113,17 +139,33 @@ class GeminiPlanner(Planner):
         if ctx_lines:
             prompt = "\n".join(ctx_lines) + "\n\n" + prompt
 
-        models = [self.model] if self.model else _FALLBACK_MODELS
-        last_err: Exception | None = None
-        for model in models:
-            try:
-                raw = _call_gemini(prompt, self.api_key, model)
-                cleaned = _extract_json(raw)
-                data = json.loads(cleaned)
-                return parse_plan(data)
-            except RuntimeError as exc:
-                last_err = exc
-                if "429" in str(exc):
-                    continue
-                raise
-        raise last_err  # type: ignore[misc]
+        raw = _call_with_fallback(prompt, self.api_key, self.model)
+        cleaned = _extract_json(raw)
+        data = json.loads(cleaned)
+        return parse_plan(data)
+
+
+def gemini_explain_error(command: str, stderr: str, api_key: str | None = None) -> str:
+    """Use Gemini to explain a command failure."""
+    key = api_key or os.environ.get("GEMINI_API_KEY", "")
+    if not key:
+        return ""
+    prompt = f"Command: {command}\nStderr:\n{stderr[:2000]}\n\nExplain why this command failed in 1-2 sentences."
+    system = "You are a shell expert. Give a concise, plain-text explanation. No markdown."
+    return _call_with_fallback(prompt, key, system=system, json_mode=False).strip()
+
+
+def gemini_repair(command: str, stdout: str, stderr: str, api_key: str | None = None) -> str:
+    """Use Gemini to suggest a repair for a failed command."""
+    key = api_key or os.environ.get("GEMINI_API_KEY", "")
+    if not key:
+        return ""
+    prompt = (
+        f"Command: {command}\n"
+        f"Stdout:\n{stdout[:1000]}\n"
+        f"Stderr:\n{stderr[:2000]}\n\n"
+        "Suggest a corrected command or fix in 1-3 sentences. "
+        "Do not suggest rm, sudo, or destructive operations."
+    )
+    system = "You are a shell expert. Give a concise, plain-text repair suggestion. No markdown."
+    return _call_with_fallback(prompt, key, system=system, json_mode=False).strip()

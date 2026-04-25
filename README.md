@@ -129,7 +129,7 @@ v0.2:
 
 - ~~Real LLM integration~~ ✓ (Gemini Flash)
 - ~~JSON schema constrained output~~ ✓
-- Automatic repair suggestions for failed commands
+- ~~Automatic repair suggestions for failed commands~~ ✓ (LLM-powered explain-error & repair)
 - Finer-grained capability system
 
 v0.3:
