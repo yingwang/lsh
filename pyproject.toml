@@ -7,7 +7,7 @@ name = "lsh"
 version = "0.1.0"
 description = "Safe LLM Shell: natural language to validated execution plans"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.9"
 dependencies = [
     "pydantic>=2.0",
 ]

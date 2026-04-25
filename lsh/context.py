@@ -5,12 +5,12 @@ from __future__ import annotations
 import os
 import platform
 from pathlib import Path
-from typing import Any
+from typing import Any, Dict
 
 from lsh.history import read_recent_history
 
 
-def collect_context(base_dir: Path | str = ".") -> dict[str, Any]:
+def collect_context(base_dir: Any = ".") -> Dict[str, Any]:
     root = Path(base_dir)
     files_preview = sorted(path.name for path in root.iterdir())[:50] if root.exists() else []
     return {

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import Any, Dict
 
 from lsh.schema import (
     FindFilesArgs,
@@ -21,12 +21,12 @@ from lsh.schema import (
 
 class Planner(ABC):
     @abstractmethod
-    def plan(self, user_input: str, context: dict[str, Any]) -> Plan:
+    def plan(self, user_input: str, context: Dict[str, Any]) -> Plan:
         """Convert natural language into a structured execution plan."""
 
 
 class MockPlanner(Planner):
-    def plan(self, user_input: str, context: dict[str, Any]) -> Plan:
+    def plan(self, user_input: str, context: Dict[str, Any]) -> Plan:
         text = user_input.strip()
         lowered = text.lower()
 
@@ -97,7 +97,7 @@ class MockPlanner(Planner):
 
 
 class OpenAIPlanner(Planner):
-    def plan(self, user_input: str, context: dict[str, Any]) -> Plan:
+    def plan(self, user_input: str, context: Dict[str, Any]) -> Plan:
         """Future real LLM-backed planner.
 
         TODO: Use JSON schema constrained output and validate the model result

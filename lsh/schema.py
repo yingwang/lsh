@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, Dict, List, Literal, Optional, Union
 
 from pydantic import BaseModel, ConfigDict, Field, RootModel, field_validator
 
@@ -26,8 +26,8 @@ class ListFilesArgs(StrictModel):
 class FindFilesArgs(StrictModel):
     path: str = "."
     pattern: str = "*.py"
-    min_size_mb: float | None = None
-    max_size_mb: float | None = None
+    min_size_mb: Optional[float] = None
+    max_size_mb: Optional[float] = None
 
 
 class ReadFileArgs(StrictModel):
@@ -77,7 +77,7 @@ class ExplainErrorStep(StrictModel):
 
 
 PlanStep = Annotated[
-    ListFilesStep | FindFilesStep | ReadFileStep | RunCommandStep | ExplainErrorStep,
+    Union[ListFilesStep, FindFilesStep, ReadFileStep, RunCommandStep, ExplainErrorStep],
     Field(discriminator="action"),
 ]
 
@@ -86,7 +86,7 @@ class Plan(StrictModel):
     intent: str
     risk: Risk
     requires_confirmation: bool = True
-    steps: list[PlanStep]
+    steps: List[PlanStep]
 
     @field_validator("intent")
     @classmethod
@@ -97,7 +97,7 @@ class Plan(StrictModel):
 
     @field_validator("steps")
     @classmethod
-    def steps_must_not_be_empty(cls, value: list[PlanStep]) -> list[PlanStep]:
+    def steps_must_not_be_empty(cls, value: List[PlanStep]) -> List[PlanStep]:
         if not value:
             raise ValueError("plan must contain at least one step")
         return value
@@ -114,7 +114,7 @@ class PlanAdapter(RootModel[Plan]):
     """Compatibility wrapper for tests that want to validate raw dictionaries."""
 
 
-def parse_plan(data: dict[str, Any]) -> Plan:
+def parse_plan(data: Dict[str, Any]) -> Plan:
     """Parse untrusted plan data into a typed Plan."""
 
     return Plan.model_validate(data)

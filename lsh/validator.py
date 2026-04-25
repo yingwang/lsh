@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 import shlex
 from pathlib import Path
+from typing import List, Tuple
 
 from lsh.schema import Plan, Risk, ValidationResult
 
@@ -47,8 +48,8 @@ FORK_BOMB_PATTERNS = (
 
 
 def validate_plan(plan: Plan) -> ValidationResult:
-    errors: list[str] = []
-    warnings: list[str] = []
+    errors: List[str] = []
+    warnings: List[str] = []
     computed_risk = Risk.LOW
 
     if plan.risk is Risk.HIGH:
@@ -80,9 +81,9 @@ def validate_plan(plan: Plan) -> ValidationResult:
     )
 
 
-def _validate_command(command: str) -> tuple[list[str], list[str], Risk]:
-    errors: list[str] = []
-    warnings: list[str] = []
+def _validate_command(command: str) -> Tuple[List[str], List[str], Risk]:
+    errors: List[str] = []
+    warnings: List[str] = []
     risk = Risk.MEDIUM
     stripped = command.strip()
     lowered = stripped.lower()
@@ -130,7 +131,7 @@ def _validate_command(command: str) -> tuple[list[str], list[str], Risk]:
     return errors, warnings, risk
 
 
-def _is_package_install(parts: list[str]) -> bool:
+def _is_package_install(parts: List[str]) -> bool:
     if not parts:
         return False
     program = Path(parts[0]).name

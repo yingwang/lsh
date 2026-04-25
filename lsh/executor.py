@@ -7,7 +7,7 @@ import shlex
 import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, List, Optional
 
 from lsh.history import ExecutionRecord, append_record
 from lsh.schema import Plan
@@ -22,17 +22,17 @@ class StepResult:
     action: str
     ok: bool
     output: Any = None
-    error: str | None = None
+    error: Optional[str] = None
 
 
 @dataclass
 class ExecutionResult:
     ok: bool
-    steps: list[StepResult] = field(default_factory=list)
+    steps: List[StepResult] = field(default_factory=list)
 
 
 class Executor:
-    def __init__(self, base_dir: Path | str = ".", timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS) -> None:
+    def __init__(self, base_dir: Any = ".", timeout_seconds: int = DEFAULT_TIMEOUT_SECONDS) -> None:
         self.base_dir = Path(base_dir)
         self.timeout_seconds = timeout_seconds
 
@@ -99,8 +99,8 @@ class Executor:
         self,
         path: str,
         pattern: str,
-        min_size_mb: float | None,
-        max_size_mb: float | None,
+        min_size_mb: Optional[float],
+        max_size_mb: Optional[float],
     ) -> StepResult:
         try:
             target = self._resolve(path)

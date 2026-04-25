@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import argparse
-from typing import Any
+from typing import Any, List, Optional
 
 from pydantic import ValidationError as PydanticValidationError
 
@@ -15,7 +15,7 @@ from lsh.schema import Plan, Risk, ValidationResult
 from lsh.validator import validate_plan
 
 
-def main(argv: list[str] | None = None) -> int:
+def main(argv: Optional[List[str]] = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
 
