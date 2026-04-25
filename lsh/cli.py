@@ -7,10 +7,12 @@ from typing import Any, List, Optional
 
 from pydantic import ValidationError as PydanticValidationError
 
+import os
+
 from lsh.context import collect_context
 from lsh.executor import Executor
 from lsh.history import last_record
-from lsh.planner import MockPlanner
+from lsh.planner import MockPlanner, Planner
 from lsh.schema import Plan, Risk, ValidationResult
 from lsh.validator import validate_plan
 
@@ -50,7 +52,7 @@ def _handle_ask(args: argparse.Namespace) -> int:
         print("Use either --execute or --dry-run, not both.")
         return 2
 
-    planner = MockPlanner()
+    planner = _get_planner()
     try:
         plan = planner.plan(args.task, collect_context())
     except PydanticValidationError as exc:
@@ -185,6 +187,14 @@ def _repair_suggestion(command: str, stdout: str, stderr: str) -> str:
     if stdout:
         return "Review stdout and stderr together, then retry with a narrower command."
     return "Inspect the stderr message and retry with corrected arguments."
+
+
+def _get_planner() -> Planner:
+    api_key = os.environ.get("GEMINI_API_KEY")
+    if api_key:
+        from lsh.gemini_planner import GeminiPlanner
+        return GeminiPlanner(api_key)
+    return MockPlanner()
 
 
 if __name__ == "__main__":

@@ -4,7 +4,7 @@
 
 ## Project Goal
 
-The goal is to make an LLM-powered shell that is useful without giving the model direct control over the operating system. In v0.1, the planner is a mock planner, but the architecture already separates planning, validation, execution, context collection, and history.
+The goal is to make an LLM-powered shell that is useful without giving the model direct control over the operating system. The architecture separates planning, validation, execution, context collection, and history. With a Gemini API key the planner uses real natural language understanding; without one it falls back to a keyword-based mock planner.
 
 ## Why Not Direct Shell Generation
 
@@ -38,21 +38,31 @@ Run tests:
 pytest
 ```
 
+## LLM Setup
+
+Get a free API key from [Google AI Studio](https://aistudio.google.com/apikey), then:
+
+```bash
+export GEMINI_API_KEY="your-key-here"
+```
+
+Without the key, lsh falls back to a keyword-based mock planner.
+
 ## Usage
 
 Show a plan without executing it:
 
 ```bash
-lsh ask "list files"
+lsh ask "list all files in src/"
 ```
 
 Example output:
 
 ```text
-Intent: list_files
+Intent: list files in src directory
 Risk: low
 Steps:
-1. list_files(path=".", recursive=false)
+1. list_files(path="src/", recursive=false)
 
 Execute? no, because --execute was not provided.
 ```
@@ -60,31 +70,30 @@ Execute? no, because --execute was not provided.
 Execute a low-risk plan:
 
 ```bash
-lsh ask "list files" --execute
+lsh ask "what git branch am I on" --execute
 ```
 
-Find Python files:
+Find files:
 
 ```bash
-lsh ask "find python files" --dry-run
+lsh ask "find all python files" --execute
 ```
 
-Read the README:
+Read a file:
 
 ```bash
-lsh ask "show readme" --execute
+lsh ask "show me the README" --execute
 ```
 
-Reject a dangerous command:
+Dangerous commands are rejected:
 
 ```bash
-lsh ask "run rm -rf ." --execute
+lsh ask "delete everything" --execute
 ```
-
-Example output:
 
 ```text
 Rejected by validator:
+- high risk plans are not allowed in v1
 - dangerous command: rm
 - destructive operation is not allowed in v1
 ```
@@ -106,7 +115,8 @@ lsh repair
 The first version uses these modules:
 
 - `lsh.schema`: Pydantic models for `Plan`, plan steps, action args, and validation results.
-- `lsh.planner`: planner interface plus a mock planner.
+- `lsh.planner`: planner interface and mock planner.
+- `lsh.gemini_planner`: Gemini Flash planner (free-tier LLM integration).
 - `lsh.validator`: policy checks for actions and command strings.
 - `lsh.executor`: controlled execution for validated plans.
 - `lsh.context`: current working directory, OS, file preview, and recent history.
@@ -117,8 +127,8 @@ The first version uses these modules:
 
 v0.2:
 
-- Real LLM integration
-- JSON schema constrained output
+- ~~Real LLM integration~~ ✓ (Gemini Flash)
+- ~~JSON schema constrained output~~ ✓
 - Automatic repair suggestions for failed commands
 - Finer-grained capability system
 
