@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lsh"
+version = "0.1.0"
+description = "Safe LLM Shell: natural language to validated execution plans"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "pydantic>=2.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+]
+
+[project.scripts]
+lsh = "lsh.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["lsh*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
